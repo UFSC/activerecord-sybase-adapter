@@ -74,7 +74,8 @@ module ActiveRecord
         delegate :map, :each, :collect!, to: :@rows
       end
 
-      ADAPTER_NAME = 'Sybase'
+      ADAPTER_NAME   = 'Sybase'
+      RUBY_ENCONDING = "UTF-8"
 
       NATIVE_DATABASE_TYPES = {
         :primary_key => "numeric(9,0) IDENTITY PRIMARY KEY",
@@ -94,11 +95,12 @@ module ActiveRecord
       def initialize(connection, logger, config)
         super(connection, logger)
         @config = config
+        @encoding = config.has_key?(:encoding) ? config[:encoding] : nil
 
         connect
 
-        @numconvert = config.has_key?(:numconvert) ? config[:numconvert] : true
-        @strip_char = config.has_key?(:strip_char) ? config[:strip_char] : false
+        @numconvert  = config.has_key?(:numconvert) ? config[:numconvert] : true
+        @strip_char  = config.has_key?(:strip_char) ? config[:strip_char] : false
         @table_types = config[:views_as_tables] ? "'U', 'V'" : "'U'"
 
         @connection.query_options[:timezone] = config[:timezone].presence || :local
@@ -215,7 +217,6 @@ module ActiveRecord
         appname = @config[:appname] || Rails.application.class.name.split('::').first rescue nil
         login_timeout = @config[:login_timeout].present? ? @config[:login_timeout].to_i : nil
         timeout = @config[:timeout].present? ? @config[:timeout].to_i/1000 : nil
-        encoding = @config[:encoding].present? ? @config[:encoding] : nil
         @connection = TinyTds::Client.new({
           :dataserver    => @config[:dataserver],
           :host          => @config[:host],
@@ -227,7 +228,7 @@ module ActiveRecord
           :appname       => appname,
           :login_timeout => login_timeout,
           :timeout       => timeout,
-          :encoding      => encoding,
+          :encoding      => @encoding,
         }).tap do |client|
             client.execute("SET ANSINULL ON").do
         end
@@ -398,12 +399,13 @@ module ActiveRecord
 
       def exec_query(sql, name = 'SQL', binds = [])
         result = nil
+        sql_db_encoding = sql.encode(@encoding)
 
-        log(sql, name, binds) do
+        log(sql_db_encoding, name, binds) do
           raise 'Connection is closed' unless active?
 
 
-          result = @connection.execute(sql)
+          result = @connection.execute(sql_db_encoding)
 
           return SybaseResult.new(result.fields, result.entries)
         end
@@ -480,9 +482,14 @@ module ActiveRecord
           exec_query(cursor, "Cursor declaration for #{name}")
         end
 
-        exec_query(sql, name).tap do |rs|
-          rs.each {|row| row.each {|k,v| v.rstrip! if v.respond_to?(:rstrip!)}} if @strip_char
+        rs = exec_query(sql, name)
+        rs.each do |row|
+          row.each do |k,v|
+            v.rstrip! if v.respond_to?(:rstrip!) if @strip_char
+            v.encode!(RUBY_ENCONDING) if v.respond_to?(:encode!)
+          end
         end
+
       end
 
       def has_identity_column(table_name)
