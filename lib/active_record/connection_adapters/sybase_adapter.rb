@@ -2,6 +2,7 @@ require 'arel/visitors/sybase'
 require 'arel/visitors/bind_visitor'
 require 'active_record/connection_adapters/abstract_adapter'
 require 'tiny_tds'
+require 'i18n'
 
 module ActiveRecord
   class Base
@@ -47,7 +48,7 @@ module ActiveRecord
 
         def initialize(name, default, sql_type = nil, nullable = nil, identity = nil, primary = nil)
           super(name, default, sql_type, nullable)
-          @default, @identity, @primary = type_cast_for_database(default), identity, primary
+          @default, @identity, @primary = type_cast(default), identity, primary
         end
 
         def simplified_type(field_type)
@@ -60,7 +61,6 @@ module ActiveRecord
             when /char|nchar|nvarchar|string|varchar/i then :string
             when /bit/i                                then :boolean
             when /datetime|smalldatetime/i             then :datetime
-            when /T_note_y/i                           then :text #don't know if this is correct mapping yet
             else                                       super
           end
         end
@@ -296,7 +296,7 @@ module ActiveRecord
         result = select sql, "Columns for #{table_name}"
 
         result.map do | row |
-          name = row['name']
+          name = I18n.transliterate(row['name'].encode(RUBY_ENCONDING))
           type = row['type']
           prec = row['prec']
           scale = row['scale']
@@ -465,7 +465,7 @@ module ActiveRecord
         true
       end
 
-      def select_rows(sql, name = nil, binds = [])
+      def select_rows(sql, name = nil)
         select(sql, name).map(&:values)
       end
 
