@@ -25,3 +25,12 @@ Credits
 Tiny TDS support was initiated by Darrin Thompson <darrinth@gmail.com>
 and completed by Marcello Barnaba <vjt@openssl.it>. Rails 3.1 support,
 Code reordering and clean up thanks to Simone Carletti <weppos@weppos.net>.
+
+UFSC version
+-------
+
+The adapter is being used in production with a Sybase ASE 16.2 using a
+specific (non-ASCII) charset. Column names with non-ASCII characters 
+are accepted. 
+Test cases have been created (and are planned to be released) for rails
+version 3.2.22.5.
