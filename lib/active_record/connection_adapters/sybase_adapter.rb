@@ -426,6 +426,10 @@ module ActiveRecord
         exec_query('SELECT @@IDENTITY AS id')
       end
 
+      def last_inserted_id(result)
+        result.first['id']
+      end
+
       def begin_db_transaction
         exec_query 'BEGIN TRAN'
       end
